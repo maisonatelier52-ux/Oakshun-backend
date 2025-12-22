@@ -1,0 +1,16 @@
+name: Deploy to Vercel (Dev Branch)
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel Deployment
+        run: |
+          curl -X POST "https://api.vercel.com/v1/integrations/deploy/prj_OyTTPfLuCTvJOKP4dYnEb7m1DXA1/EqeAsIPNPn" \
+            -H "Content-Type: application/json" \
+            -w "\nHTTP Status: %{http_code}\n"
