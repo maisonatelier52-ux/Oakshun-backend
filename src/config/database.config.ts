@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { User } from '../users/entities/user.entity';
+import { Auction } from '../auctions/entities/auction.entity';
 
 export const getDatabaseConfig = (
   configService: ConfigService,
@@ -11,7 +12,7 @@ export const getDatabaseConfig = (
   username: configService.get<string>('DB_USERNAME') || 'postgres',
   password: configService.get<string>('DB_PASSWORD') || 'superUser',
   database: configService.get<string>('DB_NAME') || 'MyDB',
-  entities: [User],
+  entities: [User, Auction],
   synchronize: configService.get<string>('NODE_ENV') !== 'production',
   logging: configService.get<string>('NODE_ENV') === 'development',
 });

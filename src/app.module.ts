@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { getDatabaseConfig } from './config/database.config';
+import { AuctionsModule } from './auctions/auctions.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { getDatabaseConfig } from './config/database.config';
     }),
     UsersModule,
     AuthModule,
+    AuctionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
