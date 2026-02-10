@@ -35,5 +35,7 @@ export class LoginResponseDto {
     id: string;
     email: string;
     name: string;
+    role: string;
+    KYC_verified: boolean;
   };
 }
