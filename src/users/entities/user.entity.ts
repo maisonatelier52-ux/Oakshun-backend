@@ -20,6 +20,21 @@ export class User {
   @Column()
   password: string;
 
+  @Column({ type: 'varchar', length: 20, default: 'buyer' })
+  role: 'buyer' | 'seller' | 'admin';
+
+  @Column({ nullable: true })
+  phone: string;
+
+  @Column({ nullable: true })
+  avatarUrl: string;
+
+  @Column({ default: false })
+  KYC_verified: boolean;
+
+  @Column({ default: false })
+  isBlocked: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
