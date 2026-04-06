@@ -9,14 +9,32 @@ import { Favorite } from '../users/entities/favorite.entity';
 
 export const getDatabaseConfig = (
   configService: ConfigService,
-): TypeOrmModuleOptions => ({
-  type: 'postgres',
-  host: configService.get<string>('DB_HOST') || 'localhost',
-  port: configService.get<number>('DB_PORT') || 5432,
-  username: configService.get<string>('DB_USERNAME') || 'postgres',
-  password: configService.get<string>('DB_PASSWORD') || 'superUser',
-  database: configService.get<string>('DB_NAME') || 'MyDB',
-  entities: [User, Auction, Bid, Transaction, Notification, Favorite],
-  synchronize: configService.get<string>('NODE_ENV') !== 'production',
-  logging: configService.get<string>('NODE_ENV') === 'development',
-});
+): TypeOrmModuleOptions => {
+  const isProduction = configService.get<string>('NODE_ENV') === 'production';
+  const databaseUrl = configService.get<string>('DATABASE_URL');
+
+  const config: TypeOrmModuleOptions = {
+    type: 'postgres',
+    entities: [User, Auction, Bid, Transaction, Notification, Favorite],
+    synchronize: !isProduction,
+    logging: !isProduction,
+  };
+
+  if (databaseUrl) {
+    Object.assign(config, {
+      url: databaseUrl,
+      ssl: isProduction ? { rejectUnauthorized: false } : false,
+    });
+  } else {
+    Object.assign(config, {
+      host: configService.get<string>('DB_HOST') || 'localhost',
+      port: configService.get<number>('DB_PORT') || 5432,
+      username: configService.get<string>('DB_USERNAME') || 'postgres',
+      password: configService.get<string>('DB_PASSWORD') || 'superUser',
+      database: configService.get<string>('DB_NAME') || 'MyDB',
+      ssl: isProduction ? { rejectUnauthorized: false } : false,
+    });
+  }
+
+  return config;
+};
