@@ -5,6 +5,6 @@ import { AuctionsModule } from '../auctions/auctions.module';
 
 @Module({
     imports: [UsersModule, AuctionsModule],
-    controllers: [AdminController],
+    controllers: [AdminController], 
 })
 export class AdminModule { }
