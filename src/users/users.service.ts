@@ -2,12 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
+import { Auction } from '../auctions/entities/auction.entity';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    @InjectRepository(Auction)
+    private auctionsRepository: Repository<Auction>,
   ) { }
 
   async findOne(email: string): Promise<User | null> {
@@ -33,6 +36,31 @@ export class UsersService {
 
   async countAll(): Promise<number> {
     return this.usersRepository.count();
+  }
+
+  async findSellers(): Promise<any[]> {
+    const sellers = await this.usersRepository.find({
+      where: { role: 'seller' },
+      order: { createdAt: 'ASC' },
+    });
+
+    // For each seller, count how many auctions they have
+    const sellersWithStats = await Promise.all(
+      sellers.map(async (seller) => {
+        const itemsSold = await this.auctionsRepository.count({
+          where: { sellerId: seller.id },
+        });
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { password, ...safeUser } = seller;
+        return {
+          ...safeUser,
+          itemsSold,
+          verified: seller.KYC_verified,
+        };
+      }),
+    );
+
+    return sellersWithStats;
   }
 
   async update(id: string, updates: Partial<User>): Promise<User> {

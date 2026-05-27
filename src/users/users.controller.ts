@@ -6,6 +6,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 export class UsersController {
     constructor(private readonly usersService: UsersService) { }
 
+    // Public endpoint - no auth required for landing page
+    @Get('sellers')
+    async getSellers() {
+        return this.usersService.findSellers();
+    }
+
     @UseGuards(JwtAuthGuard)
     @Get('profile')
     async getProfile(@Request() req: any) {
