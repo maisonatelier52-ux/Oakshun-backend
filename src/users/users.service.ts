@@ -63,6 +63,22 @@ export class UsersService {
     return sellersWithStats;
   }
 
+  async findSellerById(id: string): Promise<any> {
+    const seller = await this.usersRepository.findOne({
+      where: { id, role: 'seller' },
+    });
+    if (!seller) return null;
+    const itemsSold = await this.auctionsRepository.count({
+      where: { sellerId: seller.id },
+    });
+    const { password, ...safeUser } = seller;
+    return {
+      ...safeUser,
+      itemsSold,
+      verified: seller.KYC_verified,
+    };
+  }
+
   async update(id: string, updates: Partial<User>): Promise<User> {
     const user = await this.findById(id);
     if (!user) throw new Error('User not found');

@@ -1,4 +1,4 @@
-﻿import {
+import {
   Injectable,
   UnauthorizedException,
   ConflictException,
@@ -7,13 +7,17 @@
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
-import { LoginDto, RegisterDto, LoginResponseDto } from './dto/auth.dto';
+import { LoginDto, RegisterDto, LoginResponseDto, SendOtpDto } from './dto/auth.dto';
+import { OtpService } from './otp.service';
+import { MailService } from './mail.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private jwtService: JwtService,
     private usersService: UsersService,
+    private otpService: OtpService,
+    private mailService: MailService,
   ) { }
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -25,6 +29,18 @@ export class AuthService {
     return null;
   }
 
+  async sendOtp(sendOtpDto: SendOtpDto): Promise<{ message: string }> {
+    const existingUser = await this.usersService.findOne(sendOtpDto.email);
+    if (existingUser) {
+      throw new ConflictException('This email already exists');
+    }
+
+    const otp = this.otpService.generateOtp(sendOtpDto.email);
+    await this.mailService.sendOtp(sendOtpDto.email, otp);
+
+    return { message: 'OTP sent successfully to your email.' };
+  }
+
   async register(registerDto: RegisterDto): Promise<LoginResponseDto> {
     if (!registerDto.termsAccepted) {
       throw new BadRequestException('You must accept the terms and conditions');
@@ -33,6 +49,12 @@ export class AuthService {
     const existingUser = await this.usersService.findOne(registerDto.email);
     if (existingUser) {
       throw new ConflictException('This email already exists');
+    }
+
+    // Verify OTP
+    const isOtpValid = this.otpService.verifyOtp(registerDto.email, registerDto.otp);
+    if (!isOtpValid) {
+      throw new BadRequestException('Invalid or expired OTP');
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);

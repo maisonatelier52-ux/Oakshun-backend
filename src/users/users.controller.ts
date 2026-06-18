@@ -1,4 +1,4 @@
-import { Controller, Get, Body, Patch, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Body, Patch, UseGuards, Request, Param } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -10,6 +10,11 @@ export class UsersController {
     @Get('sellers')
     async getSellers() {
         return this.usersService.findSellers();
+    }
+
+    @Get('sellers/:id')
+    async getSellerById(@Param('id') id: string) {
+        return this.usersService.findSellerById(id);
     }
 
     @UseGuards(JwtAuthGuard)

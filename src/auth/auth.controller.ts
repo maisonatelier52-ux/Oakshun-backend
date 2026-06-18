@@ -4,11 +4,19 @@ import {
   LoginDto,
   RegisterDto,
   LoginResponseDto,
+  SendOtpDto,
 } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('send-otp')
+  async sendOtp(
+    @Body() sendOtpDto: SendOtpDto,
+  ): Promise<{ message: string }> {
+    return this.authService.sendOtp(sendOtpDto);
+  }
 
   @Post('register')
   async register(

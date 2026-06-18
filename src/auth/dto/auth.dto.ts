@@ -8,6 +8,12 @@ export class LoginDto {
   password: string; 
 }
 
+export class SendOtpDto {
+  @IsEmail({}, { message: 'Please provide a valid email address' })
+  @IsNotEmpty({ message: 'Email is required' })
+  email: string;
+}
+
 export class RegisterDto {
   @IsEmail({}, { message: 'Please provide a valid email address' })
   @IsNotEmpty({ message: 'Email is required' })
@@ -26,6 +32,10 @@ export class RegisterDto {
   @IsBoolean({ message: 'Terms acceptance must be a boolean value' })
   @IsNotEmpty({ message: 'Terms acceptance is required' })
   termsAccepted: boolean;
+
+  @IsString()
+  @IsNotEmpty({ message: 'OTP is required' })
+  otp: string;
 }
 
 export class LoginResponseDto {
