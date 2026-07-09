@@ -55,11 +55,7 @@ export class AuthService {
       throw new ConflictException('This email already exists');
     }
 
-    // Verify OTP
-    const isOtpValid = this.otpService.verifyOtp(registerDto.email, registerDto.otp);
-    if (!isOtpValid) {
-      throw new BadRequestException('Invalid or expired OTP');
-    }
+    // OTP verification removed by user request
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
     const user = await this.usersService.create(

@@ -33,11 +33,7 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'Terms acceptance is required' })
   termsAccepted: boolean;
 
-  @IsString()
-  @IsNotEmpty({ message: 'OTP is required' })
-  otp: string;
 }
-
 export class LoginResponseDto {
   access_token: string;
   user: {
