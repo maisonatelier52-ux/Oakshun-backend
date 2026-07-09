@@ -20,7 +20,7 @@ export class UploadsController {
     @UseInterceptors(
         FileInterceptor('file', {
             storage: diskStorage({
-                destination: process.env.NODE_ENV === 'production' ? '/tmp' : './public/uploads',
+                destination: process.env.VERCEL ? '/tmp' : './public/uploads',
                 filename: (req, file, callback) => {
                     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
                     const ext = extname(file.originalname);
