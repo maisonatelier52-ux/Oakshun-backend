@@ -42,35 +42,39 @@ async function bootstrap() {
 }
 
 export default async (req: any, res: any) => {
-  // Capture unhandled rejections that normally crash Vercel silently
-  const errorHandler = (err: any) => {
-    console.error('FATAL PROCESS ERROR:', err);
+  const sendError = (err: any, prefix: string) => {
+    console.error(prefix, err);
     if (!res.headersSent) {
-      res.status(500).json({
-        error: 'Fatal Process Error',
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        error: prefix,
         message: err instanceof Error ? err.message : String(err),
         stack: err instanceof Error ? err.stack : undefined
-      });
+      }));
     }
   };
 
-  process.once('uncaughtException', errorHandler);
-  process.once('unhandledRejection', errorHandler);
+  process.once('uncaughtException', (err) => sendError(err, 'Uncaught Exception'));
+  process.once('unhandledRejection', (err) => sendError(err, 'Unhandled Rejection'));
 
   try {
     const server = await bootstrap();
-    await new Promise((resolve) => {
-      res.on('finish', resolve);
-      res.on('close', resolve);
-      server(req, res);
+    await new Promise((resolve, reject) => {
+      if (typeof res.on === 'function') {
+        res.on('finish', resolve);
+        res.on('close', resolve);
+      } else {
+        // Fallback if Vercel strips EventEmitter
+        resolve(true);
+      }
+      try {
+        server(req, res);
+      } catch (e) {
+        reject(e);
+      }
     });
   } catch (error) {
-    console.error('FATAL ERROR DURING NESTJS INITIALIZATION:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ 
-        error: 'Internal Server Error', 
-        message: error instanceof Error ? error.message : String(error) 
-      });
-    }
+    sendError(error, 'Initialization Error');
   }
 };
