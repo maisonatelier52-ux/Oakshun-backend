@@ -1,16 +1,21 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
 import { AuctionsController } from './auctions.controller';
 import { AuctionsService } from './auctions.service';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Auction } from './entities/auction.entity';
-import { Bid } from './entities/bid.entity';
+import { Auction, AuctionSchema } from './entities/auction.entity';
+import { Bid, BidSchema } from './entities/bid.entity';
 import { AuctionSchedulerService } from './auctions-scheduler.service';
 import { BidsModule } from '../bids/bids.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { Favorite, FavoriteSchema } from '../users/entities/favorite.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Auction, Bid]),
+    MongooseModule.forFeature([
+      { name: Auction.name, schema: AuctionSchema },
+      { name: Bid.name, schema: BidSchema },
+      { name: Favorite.name, schema: FavoriteSchema },
+    ]),
     forwardRef(() => BidsModule),
     NotificationsModule,
   ],

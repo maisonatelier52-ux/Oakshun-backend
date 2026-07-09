@@ -1,61 +1,42 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
 import { User } from '../../users/entities/user.entity';
-import { Favorite } from '../../users/entities/favorite.entity';
 
-@Entity('auctions')
-export class Auction {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+@Schema({ timestamps: true })
+export class Auction extends Document {
+  @Prop({ required: true })
+  title: string;
 
-    @Column()
-    title: string;
+  @Prop()
+  description: string;
 
-    @Column({ type: 'text', nullable: true })
-    description: string;
+  @Prop()
+  category: string;
 
-    @Column({ nullable: true })
-    category: string;
+  @Prop({ type: Number, required: true })
+  startingPrice: number;
 
-    @Column({ type: 'decimal', precision: 10, scale: 2 })
-    startingPrice: number;
+  @Prop({ type: Number })
+  currentPrice: number;
 
-    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-    currentPrice: number;
+  @Prop({ type: Number })
+  reservePrice: number;
 
-    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-    reservePrice: number;
+  @Prop({ required: true })
+  imageUrl: string;
 
-    @Column()
-    imageUrl: string;
+  @Prop({ type: Date, required: true })
+  endTime: Date;
 
-    @Column({ type: 'timestamp' })
-    endTime: Date;
+  @Prop({ default: 'active', enum: ['draft', 'active', 'ended', 'cancelled'] })
+  status: string;
 
-    @Column({ default: 'active' }) // draft, active, ended, cancelled
-    status: string;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  sellerId: User | Types.ObjectId;
 
-    @ManyToOne(() => User, (user) => user.id)
-    @JoinColumn({ name: 'sellerId' })
-    seller: User;
-
-    @Column()
-    sellerId: string;
-
-    @ManyToOne(() => User, (user) => user.id, { nullable: true })
-    @JoinColumn({ name: 'winnerId' })
-    winner: User;
-
-    @Column({ nullable: true })
-    winnerId: string;
-
-    @CreateDateColumn()
-    createdAt: Date;
-
-    @UpdateDateColumn()
-    updatedAt: Date;
-
-    @OneToMany(() => Favorite, (favorite) => favorite.auction)
-    favorites: Favorite[];
-
-    favoritesCount?: number;
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  winnerId: User | Types.ObjectId;
 }
+
+export const AuctionSchema = SchemaFactory.createForClass(Auction);
+

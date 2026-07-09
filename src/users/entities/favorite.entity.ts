@@ -1,35 +1,17 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    ManyToOne,
-    JoinColumn,
-    Unique,
-} from 'typeorm';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
 import { User } from '../../users/entities/user.entity';
 import { Auction } from '../../auctions/entities/auction.entity';
 
-@Entity('favorites')
-@Unique(['userId', 'auctionId'])
-export class Favorite {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+@Schema({ timestamps: true })
+export class Favorite extends Document {
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  userId: User | Types.ObjectId;
 
-    @ManyToOne(() => User, (user) => user.id, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'userId' })
-    user: User;
-
-    @Column()
-    userId: string;
-
-    @ManyToOne(() => Auction, (auction) => auction.id, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'auctionId' })
-    auction: Auction;
-
-    @Column()
-    auctionId: string;
-
-    @CreateDateColumn()
-    createdAt: Date;
+  @Prop({ type: Types.ObjectId, ref: 'Auction', required: true })
+  auctionId: Auction | Types.ObjectId;
 }
+
+export const FavoriteSchema = SchemaFactory.createForClass(Favorite);
+
+FavoriteSchema.index({ userId: 1, auctionId: 1 }, { unique: true });

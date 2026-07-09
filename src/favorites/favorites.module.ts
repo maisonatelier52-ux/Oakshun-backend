@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Favorite } from '../users/entities/favorite.entity';
+import { MongooseModule } from '@nestjs/mongoose';
+import { Favorite, FavoriteSchema } from '../users/entities/favorite.entity';
 import { FavoritesService } from './favorites.service';
 import { FavoritesController } from './favorites.controller';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Favorite])],
+    imports: [MongooseModule.forFeature([{ name: Favorite.name, schema: FavoriteSchema }])],
     controllers: [FavoritesController],
     providers: [FavoritesService],
     exports: [FavoritesService],

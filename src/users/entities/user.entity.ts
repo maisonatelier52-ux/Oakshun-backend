@@ -1,43 +1,31 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document } from 'mongoose';
 
-@Entity('users')
-export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ unique: true })
+@Schema({ timestamps: true })
+export class User extends Document {
+  @Prop({ required: true, unique: true })
   email: string;
 
-  @Column({ nullable: true })
+  @Prop()
   name: string;
 
-  @Column()
+  @Prop({ required: true })
   password: string;
 
-  @Column({ type: 'varchar', length: 20, default: 'buyer' })
-  role: 'buyer' | 'seller' | 'admin';
+  @Prop({ default: 'buyer', enum: ['buyer', 'seller', 'admin'] })
+  role: string;
 
-  @Column({ nullable: true })
+  @Prop()
   phone: string;
 
-  @Column({ nullable: true })
+  @Prop()
   avatarUrl: string;
 
-  @Column({ default: false })
+  @Prop({ default: false })
   KYC_verified: boolean;
 
-  @Column({ default: false })
+  @Prop({ default: false })
   isBlocked: boolean;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
 }
+
+export const UserSchema = SchemaFactory.createForClass(User);

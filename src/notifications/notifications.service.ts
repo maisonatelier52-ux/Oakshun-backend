@@ -1,14 +1,14 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { Notification } from './entities/notification.entity';
 import { NotificationsGateway } from './notifications.gateway';
 
 @Injectable()
 export class NotificationsService {
     constructor(
-        @InjectRepository(Notification)
-        private notificationsRepository: Repository<Notification>,
+        @InjectModel(Notification.name)
+        private notificationModel: Model<Notification>,
         private notificationsGateway: NotificationsGateway,
     ) { }
 
@@ -19,8 +19,8 @@ export class NotificationsService {
         message: string;
         relatedAuctionId?: string;
     }): Promise<Notification> {
-        const notification = this.notificationsRepository.create(data);
-        const saved = await this.notificationsRepository.save(notification);
+        const notification = new this.notificationModel(data);
+        const saved = await notification.save();
 
         // Emit real-time notification
         this.notificationsGateway.sendNotification(data.userId, saved);
@@ -28,30 +28,38 @@ export class NotificationsService {
         return saved;
     }
 
-    async findAllByUser(userId: string): Promise<Notification[]> {
-        return this.notificationsRepository.find({
-            where: { userId },
-            order: { createdAt: 'DESC' },
-            take: 50,
-        });
+    async findAllByUser(userId: string): Promise<any[]> {
+        const notifications = await this.notificationModel
+            .find({ userId })
+            .sort({ createdAt: -1 })
+            .limit(50)
+            .lean()
+            .exec();
+            
+        return notifications.map(n => ({ ...n, id: n._id.toString() }));
     }
 
-    async markAsRead(id: string, userId: string): Promise<Notification> {
-        const notification = await this.notificationsRepository.findOne({
-            where: { id, userId },
-        });
+    async markAsRead(id: string, userId: string): Promise<any> {
+        const notification = await this.notificationModel.findOneAndUpdate(
+            { _id: id, userId },
+            { isRead: true },
+            { new: true }
+        ).lean().exec();
+
         if (notification) {
-            notification.isRead = true;
-            return this.notificationsRepository.save(notification);
+            return { ...notification, id: notification._id.toString() };
         }
-        throw new Error('Notification not found');
+        throw new NotFoundException('Notification not found');
     }
 
     async markAllAsRead(userId: string): Promise<void> {
-        await this.notificationsRepository.update({ userId, isRead: false }, { isRead: true });
+        await this.notificationModel.updateMany(
+            { userId, isRead: false },
+            { isRead: true }
+        ).exec();
     }
 
     async delete(id: string, userId: string): Promise<void> {
-        await this.notificationsRepository.delete({ id, userId });
+        await this.notificationModel.deleteOne({ _id: id, userId }).exec();
     }
 }

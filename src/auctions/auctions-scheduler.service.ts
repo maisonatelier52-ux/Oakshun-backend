@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { Auction } from './entities/auction.entity';
 import { Bid } from './entities/bid.entity';
 import { BiddingGateway } from '../bids/bidding.gateway';
@@ -12,10 +12,10 @@ export class AuctionSchedulerService {
     private readonly logger = new Logger(AuctionSchedulerService.name);
 
     constructor(
-        @InjectRepository(Auction)
-        private auctionsRepository: Repository<Auction>,
-        @InjectRepository(Bid)
-        private bidsRepository: Repository<Bid>,
+        @InjectModel(Auction.name)
+        private auctionModel: Model<Auction>,
+        @InjectModel(Bid.name)
+        private bidModel: Model<Bid>,
         private biddingGateway: BiddingGateway,
         private notificationsService: NotificationsService,
     ) { }
@@ -25,12 +25,10 @@ export class AuctionSchedulerService {
         this.logger.debug('Checking for ended auctions...');
 
         const now = new Date();
-        const endedAuctions = await this.auctionsRepository.find({
-            where: {
-                status: 'active',
-                endTime: LessThan(now),
-            },
-        });
+        const endedAuctions = await this.auctionModel.find({
+            status: 'active',
+            endTime: { $lt: now },
+        }).exec();
 
         if (endedAuctions.length === 0) {
             return;
@@ -43,59 +41,58 @@ export class AuctionSchedulerService {
         }
     }
 
-    private async processEndedAuction(auction: Auction) {
+    private async processEndedAuction(auction: any) {
         // Find highest bid
-        const winningBid = await this.bidsRepository.findOne({
-            where: { auctionId: auction.id },
-            order: { amount: 'DESC' },
-            relations: ['bidder'],
-        });
+        const winningBid = await this.bidModel.findOne({ auctionId: auction._id })
+            .sort({ amount: -1 })
+            .populate('bidderId')
+            .exec();
 
         if (winningBid) {
             auction.winnerId = winningBid.bidderId;
             auction.currentPrice = winningBid.amount;
             winningBid.isWinning = true;
-            await this.bidsRepository.save(winningBid);
+            await winningBid.save();
 
-            this.logger.log(`Auction ${auction.id} won by ${winningBid.bidderId} for ${winningBid.amount}`);
+            this.logger.log(`Auction ${auction._id.toString()} won by ${winningBid.bidderId._id.toString()} for ${winningBid.amount}`);
 
             // Send notification to winner
             await this.notificationsService.create({
-                userId: winningBid.bidderId,
+                userId: winningBid.bidderId._id.toString(),
                 type: 'won',
                 title: 'You won an auction!',
                 message: `Congratulations! You are the winner of "${auction.title}" with a bid of $${winningBid.amount}. Proceed to payment to claim your item.`,
-                relatedAuctionId: auction.id,
+                relatedAuctionId: auction._id.toString(),
             });
 
             // Send notification to seller
             await this.notificationsService.create({
-                userId: auction.sellerId,
+                userId: auction.sellerId.toString(),
                 type: 'sold',
                 title: 'Item Sold!',
-                message: `Great news! Your item "${auction.title}" has been sold to ${winningBid.bidder?.name || 'a buyer'} for $${winningBid.amount}.`,
-                relatedAuctionId: auction.id,
+                message: `Great news! Your item "${auction.title}" has been sold to ${(winningBid.bidderId as any)?.name || 'a buyer'} for $${winningBid.amount}.`,
+                relatedAuctionId: auction._id.toString(),
             });
         } else {
-            this.logger.log(`Auction ${auction.id} ended with no bids.`);
+            this.logger.log(`Auction ${auction._id.toString()} ended with no bids.`);
             // Send notification to seller (unsold)
             await this.notificationsService.create({
-                userId: auction.sellerId,
+                userId: auction.sellerId.toString(),
                 type: 'unsold',
                 title: 'Auction Ended (No Bids)',
                 message: `Your auction for "${auction.title}" has ended without any bids. You can relist the item to try again!`,
-                relatedAuctionId: auction.id,
+                relatedAuctionId: auction._id.toString(),
             });
         }
 
         auction.status = 'ended';
-        await this.auctionsRepository.save(auction);
+        await auction.save();
 
         // Broadcast end event
-        this.biddingGateway.broadcastAuctionEnded(auction.id, {
-            auctionId: auction.id,
+        this.biddingGateway.broadcastAuctionEnded(auction._id.toString(), {
+            auctionId: auction._id.toString(),
             status: 'ended',
-            winnerId: auction.winnerId,
+            winnerId: auction.winnerId ? auction.winnerId.toString() : undefined,
             currentPrice: auction.currentPrice,
         });
     }

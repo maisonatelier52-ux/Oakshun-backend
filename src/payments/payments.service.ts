@@ -5,8 +5,8 @@ import {
     Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import Stripe from 'stripe';
 import { Auction } from '../auctions/entities/auction.entity';
 import { TransactionsService } from '../transactions/transactions.service';
@@ -18,8 +18,8 @@ export class PaymentsService {
 
     constructor(
         private configService: ConfigService,
-        @InjectRepository(Auction)
-        private auctionsRepository: Repository<Auction>,
+        @InjectModel(Auction.name)
+        private auctionModel: Model<Auction>,
         private transactionsService: TransactionsService,
     ) {
         const stripeKey = this.configService.get<string>('STRIPE_SECRET_KEY');
@@ -32,21 +32,18 @@ export class PaymentsService {
     }
 
     async createCheckoutSession(auctionId: string, userId: string) {
-        const auction = await this.auctionsRepository.findOne({
-            where: { id: auctionId },
-            relations: ['seller'],
-        });
+        const auction = await this.auctionModel.findById(auctionId).populate('sellerId').exec();
 
         if (!auction) {
             throw new NotFoundException('Auction not found');
         }
 
-        if (auction.status !== 'ended' || auction.winnerId !== userId) {
+        if (auction.status !== 'ended' || (auction.winnerId && auction.winnerId.toString() !== userId)) {
             throw new BadRequestException('You are not the winner of this auction or it hasn\'t ended');
         }
 
         const session = await this.stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
+            payment_method_types: ['card'] as any,
             line_items: [
                 {
                     price_data: {
@@ -66,9 +63,9 @@ export class PaymentsService {
             success_url: `${this.configService.get('FRONTEND_URL')}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${this.configService.get('FRONTEND_URL')}/checkout/cancel`,
             metadata: {
-                auctionId: auction.id,
+                auctionId: auction._id.toString(),
                 buyerId: userId,
-                sellerId: auction.sellerId,
+                sellerId: auction.sellerId._id.toString(),
             },
         });
 
@@ -88,7 +85,7 @@ export class PaymentsService {
                 signature,
                 webhookSecret,
             );
-        } catch (err) {
+        } catch (err: any) {
             throw new BadRequestException(`Webhook Error: ${err.message}`);
         }
 
@@ -121,6 +118,6 @@ export class PaymentsService {
         });
 
         // Update auction status to completed
-        await this.auctionsRepository.update(auctionId as string, { status: 'completed' as any });
+        await this.auctionModel.findByIdAndUpdate(auctionId, { status: 'completed' }).exec();
     }
 }

@@ -4,8 +4,8 @@ import {
     BadRequestException,
     ForbiddenException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { Bid } from '../auctions/entities/bid.entity';
 import { Auction } from '../auctions/entities/auction.entity';
 import { CreateBidDto } from '../auctions/dto/create-bid.dto';
@@ -16,21 +16,18 @@ import { NotificationsService } from '../notifications/notifications.service';
 @Injectable()
 export class BidsService {
     constructor(
-        @InjectRepository(Bid)
-        private bidsRepository: Repository<Bid>,
-        @InjectRepository(Auction)
-        private auctionsRepository: Repository<Auction>,
+        @InjectModel(Bid.name)
+        private bidModel: Model<Bid>,
+        @InjectModel(Auction.name)
+        private auctionModel: Model<Auction>,
         private biddingGateway: BiddingGateway,
         private notificationsService: NotificationsService,
     ) { }
 
-    async placeBid(createBidDto: CreateBidDto, userId: string): Promise<Bid> {
+    async placeBid(createBidDto: CreateBidDto, userId: string): Promise<any> {
         const { auctionId, amount } = createBidDto;
 
-        const auction = await this.auctionsRepository.findOne({
-            where: { id: auctionId },
-            relations: ['seller'],
-        });
+        const auction = await this.auctionModel.findById(auctionId).populate('sellerId').exec();
 
         if (!auction) {
             throw new NotFoundException('Auction not found');
@@ -44,7 +41,7 @@ export class BidsService {
             throw new BadRequestException('Auction has ended');
         }
 
-        if (auction.sellerId === userId) {
+        if (auction.sellerId._id.toString() === userId) {
             throw new ForbiddenException('You cannot bid on your own auction');
         }
 
@@ -59,64 +56,66 @@ export class BidsService {
 
         // Update auction current price
         auction.currentPrice = amount;
-        await this.auctionsRepository.save(auction);
+        await auction.save();
 
-        if (previousHighestBid && previousHighestBid.bidderId !== userId) {
+        if (previousHighestBid && previousHighestBid.bidderId.toString() !== userId) {
             await this.notificationsService.create({
-                userId: previousHighestBid.bidderId,
+                userId: previousHighestBid.bidderId.toString(),
                 type: 'outbid',
                 title: 'You have been outbid!',
                 message: `Someone placed a higher bid of $${amount} on "${auction.title}". Bid again to stay in the lead!`,
-                relatedAuctionId: auction.id,
+                relatedAuctionId: auction._id.toString(),
             });
         }
 
-        // Mark previous winning bids as not winning (if needed logic, usually handled by simply taking the highest)
-        // For now, we assume the latest valid bid is the potential winner until end.
-        // In a more complex system we might want to flag the previous highest bid.
-
-        const bid = this.bidsRepository.create({
+        const bid = new this.bidModel({
             auctionId,
             bidderId: userId,
             amount,
             isWinning: false, // Will be set to true when auction ends
         });
 
-        const savedBid = await this.bidsRepository.save(bid);
+        const savedBid = await bid.save();
 
         // Broadcast the new bid to everyone in the auction room
         this.biddingGateway.broadcastNewBid(auctionId, {
-            bidId: savedBid.id,
+            bidId: savedBid._id.toString(),
             amount: savedBid.amount,
-            bidderId: savedBid.bidderId,
-            createdAt: savedBid.createdAt
+            bidderId: savedBid.bidderId.toString(),
+            createdAt: (savedBid as any).createdAt
         });
 
         return savedBid;
     }
 
-    async getBidsByAuction(auctionId: string): Promise<Bid[]> {
-        return this.bidsRepository.find({
-            where: { auctionId },
-            order: { amount: 'DESC' },
-            relations: ['bidder'],
-        });
+    async getBidsByAuction(auctionId: string): Promise<any[]> {
+        const bids = await this.bidModel
+            .find({ auctionId })
+            .sort({ amount: -1 })
+            .populate('bidderId')
+            .lean()
+            .exec();
+        return bids.map(bid => ({ ...bid, id: bid._id.toString(), bidder: bid.bidderId }));
     }
 
-    async getBidsByUser(userId: string): Promise<Bid[]> {
-        return this.bidsRepository.find({
-            where: { bidderId: userId },
-            order: { createdAt: 'DESC' },
-            relations: ['auction'],
-        });
+    async getBidsByUser(userId: string): Promise<any[]> {
+        const bids = await this.bidModel
+            .find({ bidderId: userId })
+            .sort({ createdAt: -1 })
+            .populate('auctionId')
+            .lean()
+            .exec();
+        return bids.map(bid => ({ ...bid, id: bid._id.toString(), auction: bid.auctionId }));
     }
 
-    async getHighestBid(auctionId: string): Promise<Bid | null> {
-        const bid = await this.bidsRepository.findOne({
-            where: { auctionId },
-            order: { amount: 'DESC' },
-            relations: ['bidder'],
-        });
-        return bid;
+    async getHighestBid(auctionId: string): Promise<any | null> {
+        const bid = await this.bidModel
+            .findOne({ auctionId })
+            .sort({ amount: -1 })
+            .populate('bidderId')
+            .lean()
+            .exec();
+        if (!bid) return null;
+        return { ...bid, id: bid._id.toString(), bidder: bid.bidderId };
     }
 }

@@ -1,48 +1,27 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    ManyToOne,
-    JoinColumn,
-} from 'typeorm';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
 import { User } from '../../users/entities/user.entity';
 import { Auction } from '../../auctions/entities/auction.entity';
 
-@Entity('notifications')
-export class Notification {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+@Schema({ timestamps: true })
+export class Notification extends Document {
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  userId: User | Types.ObjectId;
 
-    @ManyToOne(() => User, (user) => user.id, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'userId' })
-    user: User;
+  @Prop({ required: true })
+  type: string; // 'bid', 'outbid', 'won', 'sold', 'payment', etc.
 
-    @Column()
-    userId: string;
+  @Prop({ required: true })
+  title: string;
 
-    @Column()
-    type: string; // 'bid', 'outbid', 'won', 'sold', 'payment', etc.
+  @Prop({ required: true })
+  message: string;
 
-    @Column()
-    title: string;
+  @Prop({ default: false })
+  isRead: boolean;
 
-    @Column({ type: 'text' })
-    message: string;
-
-    @Column({ default: false })
-    isRead: boolean;
-
-    @ManyToOne(() => Auction, (auction) => auction.id, {
-        nullable: true,
-        onDelete: 'CASCADE',
-    })
-    @JoinColumn({ name: 'relatedAuctionId' })
-    relatedAuction: Auction;
-
-    @Column({ nullable: true })
-    relatedAuctionId: string;
-
-    @CreateDateColumn()
-    createdAt: Date;
+  @Prop({ type: Types.ObjectId, ref: 'Auction' })
+  relatedAuctionId: Auction | Types.ObjectId;
 }
+
+export const NotificationSchema = SchemaFactory.createForClass(Notification);

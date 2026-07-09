@@ -20,12 +20,15 @@ export class UsersController {
     @UseGuards(JwtAuthGuard)
     @Get('profile')
     async getProfile(@Request() req: any) {
-        const user = await this.usersService.findById(req.user.userId);
-        if (!user) {
+        const userDoc = await this.usersService.findById(req.user.userId);
+        if (!userDoc) {
             throw new Error('User not found');
         }
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { password, ...result } = user;
+        const userObj = userDoc.toObject();
+        const { password, ...result } = userObj as any;
+        result.id = userObj._id.toString();
+        delete result._id;
+        delete result.__v;
         return { user: result };
     }
 
@@ -35,9 +38,15 @@ export class UsersController {
         const allowedUpdates = {};
         if (updates.role) allowedUpdates['role'] = updates.role;
 
-        const user = await this.usersService.update(req.user.userId, allowedUpdates);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { password, ...result } = user;
+        const userDoc = await this.usersService.update(req.user.userId, allowedUpdates);
+        if (!userDoc) {
+            throw new Error('User not found');
+        }
+        const userObj = userDoc.toObject();
+        const { password, ...result } = userObj as any;
+        result.id = userObj._id.toString();
+        delete result._id;
+        delete result.__v;
         return { user: result };
     }
 }

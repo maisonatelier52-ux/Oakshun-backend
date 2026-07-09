@@ -1,56 +1,30 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    UpdateDateColumn,
-    ManyToOne,
-    JoinColumn,
-} from 'typeorm';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
 import { Auction } from '../../auctions/entities/auction.entity';
 import { User } from '../../users/entities/user.entity';
 
-@Entity('transactions')
-export class Transaction {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+@Schema({ timestamps: true })
+export class Transaction extends Document {
+  @Prop({ type: Types.ObjectId, ref: 'Auction', required: true })
+  auctionId: Auction | Types.ObjectId;
 
-    @ManyToOne(() => Auction, (auction) => auction.id, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'auctionId' })
-    auction: Auction;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  buyerId: User | Types.ObjectId;
 
-    @Column()
-    auctionId: string;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  sellerId: User | Types.ObjectId;
 
-    @ManyToOne(() => User, (user) => user.id, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'buyerId' })
-    buyer: User;
+  @Prop({ type: Number, required: true })
+  amount: number;
 
-    @Column()
-    buyerId: string;
+  @Prop()
+  paymentMethod: string;
 
-    @ManyToOne(() => User, (user) => user.id, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'sellerId' })
-    seller: User;
+  @Prop()
+  stripePaymentId: string;
 
-    @Column()
-    sellerId: string;
-
-    @Column({ type: 'decimal', precision: 10, scale: 2 })
-    amount: number;
-
-    @Column({ nullable: true })
-    paymentMethod: string;
-
-    @Column({ nullable: true })
-    stripePaymentId: string;
-
-    @Column({ default: 'pending' }) // pending, completed, failed, refunded
-    status: string;
-
-    @CreateDateColumn()
-    createdAt: Date;
-
-    @UpdateDateColumn()
-    updatedAt: Date;
+  @Prop({ default: 'pending', enum: ['pending', 'completed', 'failed', 'refunded'] })
+  status: string;
 }
+
+export const TransactionSchema = SchemaFactory.createForClass(Transaction);

@@ -4,40 +4,42 @@ import {
     ForbiddenException,
     BadRequestException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, LessThan, MoreThan } from 'typeorm';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { Auction } from './entities/auction.entity';
 import { CreateAuctionDto } from './dto/create-auction.dto';
 import { UpdateAuctionDto } from './dto/update-auction.dto';
 import { Bid } from './entities/bid.entity';
+import { Favorite } from '../users/entities/favorite.entity';
 
 @Injectable()
 export class AuctionsService {
     constructor(
-        @InjectRepository(Auction)
-        private auctionsRepository: Repository<Auction>,
-        @InjectRepository(Bid)
-        private bidsRepository: Repository<Bid>,
+        @InjectModel(Auction.name)
+        private auctionModel: Model<Auction>,
+        @InjectModel(Bid.name)
+        private bidModel: Model<Bid>,
+        @InjectModel(Favorite.name)
+        private favoriteModel: Model<Favorite>,
     ) { }
 
     async create(
         createAuctionDto: CreateAuctionDto,
         sellerId: string,
     ): Promise<Auction> {
-        // Validate end time is in the future
         const endTime = new Date(createAuctionDto.endTime);
         if (endTime <= new Date()) {
             throw new BadRequestException('End time must be in the future');
         }
 
-        const auction = this.auctionsRepository.create({
+        const auction = new this.auctionModel({
             ...createAuctionDto,
             sellerId,
             currentPrice: createAuctionDto.startingPrice,
             status: 'active',
         });
 
-        return this.auctionsRepository.save(auction);
+        return auction.save();
     }
 
     async findAll(filters?: {
@@ -49,87 +51,84 @@ export class AuctionsService {
         sellerId?: string;
         page?: number;
         limit?: number;
-    }): Promise<{ auctions: Auction[]; total: number; page: number; totalPages: number }> {
+    }): Promise<{ auctions: any[]; total: number; page: number; totalPages: number }> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 20;
         const skip = (page - 1) * limit;
 
-        const queryBuilder = this.auctionsRepository
-            .createQueryBuilder('auction')
-            .leftJoinAndSelect('auction.seller', 'seller')
-            .leftJoinAndSelect('auction.winner', 'winner')
-            .loadRelationCountAndMap('auction.favoritesCount', 'auction.favorites');
+        const query: any = {};
 
-        // Apply filters
         if (filters?.category) {
-            queryBuilder.andWhere('auction.category = :category', {
-                category: filters.category,
-            });
+            query.category = filters.category;
         }
-
         if (filters?.status) {
-            queryBuilder.andWhere('auction.status = :status', {
-                status: filters.status,
-            });
+            query.status = filters.status;
         }
-
         if (filters?.search) {
-            queryBuilder.andWhere(
-                '(auction.title ILIKE :search OR auction.description ILIKE :search)',
-                { search: `%${filters.search}%` },
-            );
+            query.$or = [
+                { title: { $regex: filters.search, $options: 'i' } },
+                { description: { $regex: filters.search, $options: 'i' } },
+            ];
         }
-
-        if (filters?.minPrice) {
-            queryBuilder.andWhere('auction.currentPrice >= :minPrice', {
-                minPrice: filters.minPrice,
-            });
+        if (filters?.minPrice || filters?.maxPrice) {
+            query.currentPrice = {};
+            if (filters.minPrice) query.currentPrice.$gte = filters.minPrice;
+            if (filters.maxPrice) query.currentPrice.$lte = filters.maxPrice;
         }
-
-        if (filters?.maxPrice) {
-            queryBuilder.andWhere('auction.currentPrice <= :maxPrice', {
-                maxPrice: filters.maxPrice,
-            });
-        }
-
         if (filters?.sellerId) {
-            queryBuilder.andWhere('auction.sellerId = :sellerId', {
-                sellerId: filters.sellerId,
-            });
+            query.sellerId = filters.sellerId;
         }
 
-        // Get total count
-        const total = await queryBuilder.getCount();
-
-        // Apply pagination and ordering
-        const auctions = await queryBuilder
-            .orderBy('auction.createdAt', 'DESC')
+        const total = await this.auctionModel.countDocuments(query).exec();
+        
+        const auctions = await this.auctionModel
+            .find(query)
+            .sort({ createdAt: -1 })
             .skip(skip)
-            .take(limit)
-            .getMany();
+            .limit(limit)
+            .populate('sellerId')
+            .populate('winnerId')
+            .lean()
+            .exec();
+
+        // Add favoritesCount
+        const auctionsWithStats = await Promise.all(
+            auctions.map(async (auction) => {
+                const favoritesCount = await this.favoriteModel.countDocuments({ auctionId: auction._id }).exec();
+                const mapped = { ...auction, id: auction._id.toString(), favoritesCount, seller: auction.sellerId, winner: auction.winnerId };
+                return mapped;
+            })
+        );
 
         return {
-            auctions,
+            auctions: auctionsWithStats,
             total,
             page,
             totalPages: Math.ceil(total / limit),
         };
     }
 
-    async findOne(id: string): Promise<Auction> {
-        const auction = await this.auctionsRepository
-            .createQueryBuilder('auction')
-            .leftJoinAndSelect('auction.seller', 'seller')
-            .leftJoinAndSelect('auction.winner', 'winner')
-            .loadRelationCountAndMap('auction.favoritesCount', 'auction.favorites')
-            .where('auction.id = :id', { id })
-            .getOne();
+    async findOne(id: string): Promise<any> {
+        const auction = await this.auctionModel
+            .findById(id)
+            .populate('sellerId')
+            .populate('winnerId')
+            .lean()
+            .exec();
 
         if (!auction) {
             throw new NotFoundException(`Auction with ID ${id} not found`);
         }
 
-        return auction;
+        const favoritesCount = await this.favoriteModel.countDocuments({ auctionId: auction._id }).exec();
+        
+        return {
+            ...auction,
+            id: auction._id.toString(),
+            seller: auction.sellerId,
+            winner: auction.winnerId,
+            favoritesCount
+        };
     }
 
     async update(
@@ -138,71 +137,88 @@ export class AuctionsService {
         userId: string,
         userRole: string,
     ): Promise<Auction> {
-        const auction = await this.findOne(id);
+        const auction = await this.auctionModel.findById(id).exec();
+        if (!auction) throw new NotFoundException('Auction not found');
 
-        // Only seller or admin can update
-        if (auction.sellerId !== userId && userRole !== 'admin') {
+        if (auction.sellerId.toString() !== userId && userRole !== 'admin') {
             throw new ForbiddenException('You can only update your own auctions');
         }
 
-        // Prevent updating ended auctions
         if (auction.status === 'ended' && userRole !== 'admin') {
             throw new BadRequestException('Cannot update ended auctions');
         }
 
         Object.assign(auction, updateAuctionDto);
-        return this.auctionsRepository.save(auction);
+        return auction.save();
     }
 
     async remove(id: string, userId: string, userRole: string): Promise<void> {
-        const auction = await this.findOne(id);
+        const auction = await this.auctionModel.findById(id).exec();
+        if (!auction) throw new NotFoundException('Auction not found');
 
-        // Only seller or admin can delete
-        if (auction.sellerId !== userId && userRole !== 'admin') {
+        if (auction.sellerId.toString() !== userId && userRole !== 'admin') {
             throw new ForbiddenException('You can only delete your own auctions');
         }
 
-        // Prevent deleting auctions with bids (unless admin)
         if (auction.currentPrice > auction.startingPrice && userRole !== 'admin') {
             throw new BadRequestException(
                 'Cannot delete auctions that have received bids',
             );
         }
 
-        await this.auctionsRepository.remove(auction);
+        await this.auctionModel.deleteOne({ _id: id }).exec();
     }
 
-    async findEndingSoon(hours: number = 24): Promise<Auction[]> {
+    async findEndingSoon(hours: number = 24): Promise<any[]> {
         const now = new Date();
         const futureTime = new Date(now.getTime() + hours * 60 * 60 * 1000);
 
-        return this.auctionsRepository
-            .createQueryBuilder('auction')
-            .leftJoinAndSelect('auction.seller', 'seller')
-            .loadRelationCountAndMap('auction.favoritesCount', 'auction.favorites')
-            .where('auction.status = :status', { status: 'active' })
-            .andWhere('auction.endTime < :futureTime', { futureTime })
-            .orderBy('auction.endTime', 'ASC')
-            .take(10)
-            .getMany();
+        const auctions = await this.auctionModel
+            .find({
+                status: 'active',
+                endTime: { $lt: futureTime }
+            })
+            .sort({ endTime: 1 })
+            .limit(10)
+            .populate('sellerId')
+            .lean()
+            .exec();
+
+        return Promise.all(
+            auctions.map(async (auction) => {
+                const favoritesCount = await this.favoriteModel.countDocuments({ auctionId: auction._id }).exec();
+                return { ...auction, id: auction._id.toString(), favoritesCount, seller: auction.sellerId };
+            })
+        );
     }
 
-    async findByCategory(category: string): Promise<Auction[]> {
-        return this.auctionsRepository
-            .createQueryBuilder('auction')
-            .leftJoinAndSelect('auction.seller', 'seller')
-            .loadRelationCountAndMap('auction.favoritesCount', 'auction.favorites')
-            .where('auction.category = :category', { category })
-            .andWhere('auction.status = :status', { status: 'active' })
-            .orderBy('auction.createdAt', 'DESC')
-            .getMany();
+    async findByCategory(category: string): Promise<any[]> {
+        const auctions = await this.auctionModel
+            .find({
+                category,
+                status: 'active'
+            })
+            .sort({ createdAt: -1 })
+            .populate('sellerId')
+            .lean()
+            .exec();
+
+        return Promise.all(
+            auctions.map(async (auction) => {
+                const favoritesCount = await this.favoriteModel.countDocuments({ auctionId: auction._id }).exec();
+                return { ...auction, id: auction._id.toString(), favoritesCount, seller: auction.sellerId };
+            })
+        );
     }
 
-    async findBidsByAuction(auctionId: string): Promise<Bid[]> {
-        return this.bidsRepository.find({
-            where: { auctionId },
-            order: { amount: 'DESC' },
-            relations: ['bidder'],
-        });
+    async findBidsByAuction(auctionId: string): Promise<any[]> {
+        const bids = await this.bidModel
+            .find({ auctionId })
+            .sort({ amount: -1 })
+            .populate('bidderId')
+            .lean()
+            .exec();
+            
+        return bids.map(bid => ({ ...bid, id: bid._id.toString(), bidder: bid.bidderId }));
     }
 }

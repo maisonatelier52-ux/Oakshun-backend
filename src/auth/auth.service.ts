@@ -21,9 +21,13 @@ export class AuthService {
   ) { }
 
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.usersService.findOne(email);
-    if (user && (await bcrypt.compare(password, user.password))) {
-      const { password, ...result } = user;
+    const userDoc = await this.usersService.findOne(email);
+    if (userDoc && (await bcrypt.compare(password, userDoc.password))) {
+      const userObj = userDoc.toObject();
+      const { password, ...result } = userObj as any;
+      result.id = userObj._id.toString();
+      delete result._id;
+      delete result.__v;
       return result;
     }
     return null;
@@ -64,11 +68,11 @@ export class AuthService {
       hashedPassword,
     );
 
-    const payload = { email: user.email, sub: user.id, role: user.role };
+    const payload = { email: user.email, sub: user._id.toString(), role: user.role };
     return {
       access_token: this.jwtService.sign(payload),
       user: {
-        id: user.id,
+        id: user._id.toString(),
         email: user.email,
         name: user.name,
         role: user.role,

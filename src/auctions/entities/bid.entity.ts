@@ -1,39 +1,21 @@
-import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    CreateDateColumn,
-    ManyToOne,
-    JoinColumn,
-} from 'typeorm';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
 import { Auction } from '../../auctions/entities/auction.entity';
 import { User } from '../../users/entities/user.entity';
 
-@Entity('bids')
-export class Bid {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+@Schema({ timestamps: true })
+export class Bid extends Document {
+  @Prop({ type: Types.ObjectId, ref: 'Auction', required: true })
+  auctionId: Auction | Types.ObjectId;
 
-    @ManyToOne(() => Auction, (auction) => auction.id, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'auctionId' })
-    auction: Auction;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  bidderId: User | Types.ObjectId;
 
-    @Column()
-    auctionId: string;
+  @Prop({ type: Number, required: true })
+  amount: number;
 
-    @ManyToOne(() => User, (user) => user.id, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'bidderId' })
-    bidder: User;
-
-    @Column()
-    bidderId: string;
-
-    @Column({ type: 'decimal', precision: 10, scale: 2 })
-    amount: number;
-
-    @Column({ default: false })
-    isWinning: boolean;
-
-    @CreateDateColumn()
-    createdAt: Date;
+  @Prop({ default: false })
+  isWinning: boolean;
 }
+
+export const BidSchema = SchemaFactory.createForClass(Bid);

@@ -1,33 +1,31 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { Favorite } from '../users/entities/favorite.entity';
 
 @Injectable()
 export class FavoritesService {
     constructor(
-        @InjectRepository(Favorite)
-        private favoritesRepository: Repository<Favorite>,
+        @InjectModel(Favorite.name)
+        private favoriteModel: Model<Favorite>,
     ) { }
 
     async toggle(userId: string, auctionId: string): Promise<{ favorited: boolean; favoritesCount?: number }> {
-        const existing = await this.favoritesRepository.findOne({
-            where: { userId, auctionId },
-        });
+        const existing = await this.favoriteModel.findOne({ userId, auctionId }).exec();
 
         if (existing) {
-            await this.favoritesRepository.remove(existing);
+            await this.favoriteModel.deleteOne({ _id: existing._id }).exec();
             const count = await this.countByAuction(auctionId);
             return { favorited: false, favoritesCount: count };
         }
 
-        const favorite = this.favoritesRepository.create({ userId, auctionId });
+        const favorite = new this.favoriteModel({ userId, auctionId });
         try {
-            await this.favoritesRepository.save(favorite);
+            await favorite.save();
             const count = await this.countByAuction(auctionId);
             return { favorited: true, favoritesCount: count };
-        } catch (error) {
-            if (error.code === '23505') { // Unique constraint violation
+        } catch (error: any) {
+            if (error.code === 11000) { // MongoDB Unique constraint violation
                 const count = await this.countByAuction(auctionId);
                 return { favorited: true, favoritesCount: count };
             }
@@ -35,24 +33,27 @@ export class FavoritesService {
         }
     }
 
-    async findAllByUser(userId: string): Promise<Favorite[]> {
-        return this.favoritesRepository.find({
-            where: { userId },
-            relations: ['auction'],
-            order: { createdAt: 'DESC' },
-        });
+    async findAllByUser(userId: string): Promise<any[]> {
+        const favorites = await this.favoriteModel
+            .find({ userId })
+            .populate('auctionId')
+            .sort({ createdAt: -1 })
+            .lean()
+            .exec();
+        
+        return favorites.map(fav => ({
+            ...fav,
+            id: fav._id.toString(),
+            auction: fav.auctionId
+        }));
     }
 
     async isFavorited(userId: string, auctionId: string): Promise<boolean> {
-        const count = await this.favoritesRepository.count({
-            where: { userId, auctionId },
-        });
+        const count = await this.favoriteModel.countDocuments({ userId, auctionId }).exec();
         return count > 0;
     }
 
     async countByAuction(auctionId: string): Promise<number> {
-        return this.favoritesRepository.count({
-            where: { auctionId },
-        });
+        return this.favoriteModel.countDocuments({ auctionId }).exec();
     }
 }
