@@ -42,14 +42,35 @@ async function bootstrap() {
 }
 
 export default async (req: any, res: any) => {
+  // Capture unhandled rejections that normally crash Vercel silently
+  const errorHandler = (err: any) => {
+    console.error('FATAL PROCESS ERROR:', err);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Fatal Process Error',
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      });
+    }
+  };
+
+  process.once('uncaughtException', errorHandler);
+  process.once('unhandledRejection', errorHandler);
+
   try {
     const server = await bootstrap();
-    return server(req, res);
+    await new Promise((resolve) => {
+      res.on('finish', resolve);
+      res.on('close', resolve);
+      server(req, res);
+    });
   } catch (error) {
     console.error('FATAL ERROR DURING NESTJS INITIALIZATION:', error);
-    res.status(500).json({ 
-      error: 'Internal Server Error', 
-      message: error instanceof Error ? error.message : String(error) 
-    });
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        error: 'Internal Server Error', 
+        message: error instanceof Error ? error.message : String(error) 
+      });
+    }
   }
 };
