@@ -24,14 +24,19 @@ export class PaymentsService {
     ) {
         const stripeKey = this.configService.get<string>('STRIPE_SECRET_KEY');
         if (!stripeKey) {
-            throw new Error('STRIPE_SECRET_KEY is not defined');
+            this.logger.warn('STRIPE_SECRET_KEY is not defined. Payment features will be disabled.');
+        } else {
+            this.stripe = new Stripe(stripeKey, {
+                apiVersion: '2025-01-27' as any,
+            });
         }
-        this.stripe = new Stripe(stripeKey, {
-            apiVersion: '2025-01-27' as any,
-        });
     }
 
     async createCheckoutSession(auctionId: string, userId: string) {
+        if (!this.stripe) {
+            throw new BadRequestException('Payment features are not configured');
+        }
+
         const auction = await this.auctionModel.findById(auctionId).populate('sellerId').exec();
 
         if (!auction) {
@@ -73,9 +78,13 @@ export class PaymentsService {
     }
 
     async handleWebhook(signature: string, payload: Buffer) {
+        if (!this.stripe) {
+            throw new BadRequestException('Payment features are not configured');
+        }
+
         const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
         if (!webhookSecret) {
-            throw new Error('STRIPE_WEBHOOK_SECRET is not defined');
+            throw new BadRequestException('STRIPE_WEBHOOK_SECRET is not defined');
         }
         let event: Stripe.Event;
 
