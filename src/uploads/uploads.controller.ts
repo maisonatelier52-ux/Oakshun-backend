@@ -3,15 +3,26 @@ import {
     Post,
     UseInterceptors,
     UploadedFile,
-    ParseFilePipe,
-    MaxFileSizeValidator,
-    FileTypeValidator,
     UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { v2 as cloudinary } from 'cloudinary';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+cloudinary.config({
+    cloud_name: 'k43wtdgk',
+    api_key: '156293741679574',
+    api_secret: 'SHPzEMV37SI9x1KtmKL64xki0XA'
+});
+
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'oakshun',
+        allowed_formats: ['jpg', 'png', 'jpeg', 'webp', 'gif'],
+    } as any,
+});
 
 @Controller('uploads')
 @UseGuards(JwtAuthGuard)
@@ -19,34 +30,26 @@ export class UploadsController {
     @Post('image')
     @UseInterceptors(
         FileInterceptor('file', {
-            storage: diskStorage({
-                destination: '/tmp',
-                filename: (req, file, callback) => {
-                    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-                    const ext = extname(file.originalname);
-                    const filename = `${uniqueSuffix}${ext}`;
-                    callback(null, filename);
-                },
-            }),
+            storage: storage,
         }),
     )
     uploadFile(
-        @UploadedFile() file: Express.Multer.File,
+        @UploadedFile() file: any,
     ) {
-        console.log('--- Upload Request Received ---');
+        console.log('--- Cloudinary Upload Request Received ---');
         if (!file) {
             console.error('No file received in request!');
             return { error: 'No file received' };
         }
-        console.log('File details:', {
-            originalname: file.originalname,
+        
+        console.log('File successfully uploaded to Cloudinary:', {
+            url: file.path,
             filename: file.filename,
-            mimetype: file.mimetype,
-            size: file.size
         });
-        // Return the URL to access the file
+
+        // Cloudinary returns the full URL in `file.path`
         return {
-            url: `/uploads/${file.filename}`,
+            url: file.path,
         };
     }
 }
