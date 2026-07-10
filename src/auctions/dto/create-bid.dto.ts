@@ -1,8 +1,8 @@
-import { IsNotEmpty, IsNumber, IsUUID, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsMongoId, Min } from 'class-validator';
 
 export class CreateBidDto {
     @IsNotEmpty()
-    @IsUUID()
+    @IsMongoId()
     auctionId: string;
 
     @IsNotEmpty()
