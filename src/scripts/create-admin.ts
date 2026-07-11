@@ -22,7 +22,7 @@ async function createAdmin() {
 
     const userRepository = dataSource.getRepository(User);
     const email = 'admin@gmail.com';
-    const password = 'admin';
+    const password = 'adminlogin';
 
     let adminUser = await userRepository.findOne({ where: { email } });
     const hashedPassword = await bcrypt.hash(password, 10);
