@@ -35,8 +35,11 @@ export class UsersController {
     @UseGuards(JwtAuthGuard)
     @Patch('profile')
     async updateProfile(@Request() req: any, @Body() updates: any) {
-        const allowedUpdates = {};
+        const allowedUpdates: any = {};
         if (updates.role) allowedUpdates['role'] = updates.role;
+        if (updates.name) allowedUpdates['name'] = updates.name;
+        if (updates.phone) allowedUpdates['phone'] = updates.phone;
+        if (updates.avatarUrl) allowedUpdates['avatarUrl'] = updates.avatarUrl;
 
         const userDoc = await this.usersService.update(req.user.userId, allowedUpdates);
         if (!userDoc) {
