@@ -18,7 +18,11 @@ async function bootstrap() {
 
   // Enable CORS
   app.enableCors({
-    origin: true, // Reflect request origin to allow any origin in development with credentials
+    origin: [
+      'https://oakshun-frontend.vercel.app', 
+      'http://localhost:3000',
+      'http://192.168.29.159:3000'
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],

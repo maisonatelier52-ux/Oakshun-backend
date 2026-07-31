@@ -19,7 +19,11 @@ async function bootstrap() {
 
     // Enable CORS
     app.enableCors({
-      origin: true,
+      origin: [
+        'https://oakshun-frontend.vercel.app', 
+        'http://localhost:3000',
+        'http://192.168.29.159:3000'
+      ],
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
@@ -47,6 +51,8 @@ export default async (req: any, res: any) => {
     if (!res.headersSent) {
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Access-Control-Allow-Origin', 'https://oakshun-frontend.vercel.app');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.end(JSON.stringify({
         error: prefix,
         message: err instanceof Error ? err.message : String(err),
