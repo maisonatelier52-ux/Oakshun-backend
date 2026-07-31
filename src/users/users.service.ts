@@ -75,4 +75,12 @@ export class UsersService {
   async update(id: string, updates: Partial<User>): Promise<User | null> {
     return this.userModel.findByIdAndUpdate(id, updates, { new: true }).exec();
   }
+
+  async remove(id: string): Promise<User | null> {
+    return this.userModel.findByIdAndDelete(id).exec();
+  }
+
+  async countSellers(): Promise<number> {
+    return this.userModel.countDocuments({ role: 'seller' }).exec();
+  }
 }

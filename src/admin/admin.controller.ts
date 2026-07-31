@@ -28,10 +28,12 @@ export class AdminController {
     @Get('stats')
     async getStats() {
         const usersCount = await this.usersService.countAll();
+        const sellersCount = await this.usersService.countSellers();
         const auctionsData = await this.auctionsService.findAll({ limit: 1000 });
 
         return {
             totalUsers: usersCount,
+            totalSellers: sellersCount,
             totalAuctions: auctionsData.total,
             activeAuctions: auctionsData.auctions.filter(a => a.status === 'active').length,
             completedAuctions: auctionsData.auctions.filter(a => a.status === 'completed').length,
@@ -87,6 +89,22 @@ export class AdminController {
         return this.auctionsService.findAll({ sellerId: id, limit: 1000 });
     }
 
+    @Delete('sellers/:id')
+    async deleteSeller(@Param('id') id: string) {
+        // Delete all auctions belonging to this seller
+        const auctionsData = await this.auctionsService.findAll({ sellerId: id, limit: 10000 });
+        for (const auction of auctionsData.auctions) {
+            try {
+                await this.auctionsService.remove(auction.id, 'admin', 'admin');
+            } catch (e) {
+                // continue even if individual auction removal fails
+            }
+        }
+        // Delete the seller user
+        await this.usersService.remove(id);
+        return { message: 'Seller and their auctions have been removed' };
+    }
+
     @Get('auctions')
     findAllAuctions() {
         return this.auctionsService.findAll({ limit: 100 });
@@ -98,4 +116,3 @@ export class AdminController {
         return this.auctionsService.remove(id, userId, 'admin');
     }
 }
-
