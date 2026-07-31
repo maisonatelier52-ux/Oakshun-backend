@@ -10,7 +10,7 @@ import { FavoritesService } from './favorites.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('favorites')
-export class FavoritesController {
+export class FavoritesController { 
     constructor(private readonly favoritesService: FavoritesService) { }
 
     @Post(':auctionId')
