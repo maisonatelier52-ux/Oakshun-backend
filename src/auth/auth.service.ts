@@ -95,29 +95,4 @@ export class AuthService {
       },
     };
   }
-
-  // ⚠️ TEMPORARY: Remove this method after the admin account is created
-  async seedAdmin(): Promise<{ message: string }> {
-    const email = 'admin@gmail.com';
-    const password = 'adminlogin';
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const existing = await this.usersService.findOne(email);
-    if (existing) {
-      await this.usersService.update(existing._id.toString(), {
-        password: hashedPassword,
-        role: 'admin',
-        name: 'Administrator',
-        KYC_verified: true,
-      } as any);
-      return { message: `✅ Admin updated: email=${email}, password=adminlogin, role=admin` };
-    }
-
-    await this.usersService.create(email, 'Administrator', hashedPassword);
-    const newUser = await this.usersService.findOne(email);
-    if (newUser) {
-      await this.usersService.update(newUser._id.toString(), { role: 'admin', KYC_verified: true } as any);
-    }
-    return { message: `✅ Admin created: email=${email}, password=adminlogin, role=admin` };
-  }
 }

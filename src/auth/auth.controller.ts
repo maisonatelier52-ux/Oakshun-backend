@@ -29,10 +29,4 @@ export class AuthController {
   async login(@Body() loginDto: LoginDto): Promise<LoginResponseDto> {
     return this.authService.login(loginDto);
   }
-
-  // ⚠️ TEMPORARY: Remove this endpoint after admin is created
-  @Post('seed-admin')
-  async seedAdmin(): Promise<{ message: string }> {
-    return this.authService.seedAdmin();
-  }
 }
