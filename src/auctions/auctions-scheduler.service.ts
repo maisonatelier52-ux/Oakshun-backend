@@ -43,7 +43,7 @@ export class AuctionSchedulerService {
 
     private async processEndedAuction(auction: any) {
         // Find highest bid
-        const winningBid = await this.bidModel.findOne({ auctionId: auction._id })
+        const winningBid = await this.bidModel.findOne({ auctionId: auction._id.toString() })
             .sort({ amount: -1 })
             .populate('bidderId')
             .exec();
